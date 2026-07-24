@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+html.light {
+  color-scheme: light;
+}
+
+html.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Light Mode Aesthetic Overrides for High Contrast Enterprise UI */
+html.light .bg-slate-950 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+html.light .bg-slate-900 {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+html.light .bg-slate-950\/60, html.light .bg-slate-900\/90 {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .border-slate-800, 
+html.light .border-slate-800\/90, 
+html.light .border-slate-800\/80, 
+html.light .border-slate-800\/60, 
+html.light .border-slate-800\/50,
+html.light .border-slate-900 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .text-slate-100, 
+html.light .text-slate-200, 
+html.light .text-slate-300 {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-400, 
+html.light .text-slate-500 {
+  color: #475569 !important;
+}

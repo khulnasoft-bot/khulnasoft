@@ -1,0 +1,8 @@
+{
+  "name": "KhulnaSoft Platform v1",
+  "description": "AI-native engineering platform unifying GitHub, documentation, CI/CD, security, package registry, knowledge graph, and Kubernetes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
