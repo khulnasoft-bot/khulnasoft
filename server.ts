@@ -16,6 +16,8 @@ import {
   upsertRepositoryRecord,
   seedInitialGitHubData,
 } from './src/db/github.ts';
+import GitHubClient from './src/services/github/client';
+import { enqueueOrgSync } from './src/queue/syncProducer';
 
 dotenv.config();
 
@@ -52,6 +54,32 @@ function getAiClient(): GoogleGenAI {
   }
   return aiClient;
 }
+
+// GitHub webhook endpoint (raw body required for signature verification)
+app.post('/api/github/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  try {
+    const rawBody = req.body as Buffer;
+    const sig = (req.headers['x-hub-signature-256'] as string) || null;
+    const event = req.headers['x-github-event'] as string | undefined;
+
+    const gh = new GitHubClient();
+    if (!gh.verifyWebhookSignature(rawBody, sig)) {
+      return res.status(401).json({ error: 'Invalid webhook signature' });
+    }
+
+    const payload = JSON.parse(rawBody.toString('utf8'));
+
+    // Basic handling for common events — extend later
+    console.log('Received GitHub webhook event:', event, payload?.action || 'n/a');
+
+    // TODO: enqueue job for background processing (sync/discover/analyze)
+
+    return res.json({ success: true, event: event || null, action: payload.action || null });
+  } catch (err: any) {
+    console.error('Error handling GitHub webhook:', err);
+    return res.status(500).json({ error: 'Webhook processing failed', details: err.message });
+  }
+});
 
 // ==================== PHASE 1 REPOSITORY CATALOG API ROUTES ====================
 
@@ -338,7 +366,7 @@ app.get('/api/github/discovery', async (req, res) => {
     let filtered: any[] = dbRepos.length > 0 ? (dbRepos as any[]) : (repositoriesCatalog as any[]);
 
     if (query) {
-      filtered = filtered.filter((r: any) => 
+      filtered = filtered.filter((r: any) =>
         r.name.toLowerCase().includes(query) ||
         (r.description && r.description.toLowerCase().includes(query)) ||
         (r.language && r.language.toLowerCase().includes(query))
@@ -474,6 +502,21 @@ app.post('/api/github/orgs/sync', async (req, res) => {
   }
 });
 
+// POST /api/github/orgs/queue-sync - Enqueue organization sync job (uses Redis/BullMQ)
+app.post('/api/github/orgs/queue-sync', async (req, res) => {
+  try {
+    const { orgName, priority } = req.body;
+    const login = (orgName || 'khulnasoft').toLowerCase();
+
+    const jobId = await enqueueOrgSync(login, { priority });
+
+    res.json({ success: true, message: `Enqueued organization sync for ${login}`, jobId });
+  } catch (err: any) {
+    console.error('Failed to enqueue org sync:', err);
+    res.status(500).json({ error: 'Failed to enqueue org sync', details: err.message });
+  }
+});
+
 // GET /api/database/status - Database health & schema status check
 app.get('/api/database/status', async (req, res) => {
   try {
@@ -557,7 +600,7 @@ app.post('/api/score', (req, res) => {
   }
 
   const repo = repositoriesCatalog[repoIndex];
-  
+
   // Recalculate score components
   const docsScore = (repo.readmeMarkdown ? 6 : 0) + 4 + 4 + 3 + 3; // 20
   const secScore = repo.securityScore > 95 ? 20 : repo.securityScore > 90 ? 18 : 15;
@@ -632,7 +675,7 @@ app.post('/api/gemini/analyze', async (req, res) => {
     }
 
     const ai = getAiClient();
-    
+
     // Use stable recommended flash model alias
     const modelName = 'gemini-3.6-flash';
 
@@ -660,7 +703,7 @@ Context provided: ${JSON.stringify(repoContext || {})}`;
     });
   } catch (error: any) {
     console.error('Error in /api/gemini/analyze:', error);
-    
+
     // Fallback gracefully with intelligent domain-aware structured output if API key is not configured or throws error
     return res.json({
       success: true,
@@ -732,7 +775,7 @@ Keep responses clear, professional, well-formatted, and actionable. Include Merm
     console.error('Error in /api/gemini/chat:', error);
 
     const userLastMsg = req.body.messages?.[req.body.messages.length - 1]?.content || '';
-    
+
     // Provide a smart contextual reply
     let replyContent = `I have analyzed your request regarding **KhulnaSoft Platform**:
 
