@@ -24,9 +24,13 @@ import { ObservabilityView } from './views/ObservabilityView';
 import { SecurityCenterView } from './views/SecurityCenterView';
 import { AiAssistantView } from './views/AiAssistantView';
 import { EnterpriseManagementView } from './views/EnterpriseManagementView';
+import { Login } from './components/Login';
 import { TabType } from './types';
 
 function MainApp() {
+  const { user, isAuthenticated, inspectTokensOpen, setInspectTokensOpen } = useAuth();
+  const { theme } = useTheme();
+
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [selectedRepoId, setSelectedRepoId] = useState<string>('repo-core-api');
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
@@ -38,8 +42,9 @@ function MainApp() {
   const [walkthroughStepIndex, setWalkthroughStepIndex] = useState<number>(0);
   const [completedWalkthroughSteps, setCompletedWalkthroughSteps] = useState<string[]>(['step-repos']);
 
-  const { inspectTokensOpen, setInspectTokensOpen } = useAuth();
-  const { theme } = useTheme();
+  if (!isAuthenticated || !user) {
+    return <Login />;
+  }
 
   const handleOpenWalkthrough = (stepIndex: number = 0) => {
     setWalkthroughStepIndex(stepIndex);

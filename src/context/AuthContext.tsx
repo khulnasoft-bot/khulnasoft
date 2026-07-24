@@ -121,7 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Fallback
       }
     }
-    return DEFAULT_USERS.okta; // Default authenticated platform admin user
+    return null; // Start unauthenticated if no saved session
   });
 
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);

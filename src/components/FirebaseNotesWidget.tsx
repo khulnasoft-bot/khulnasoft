@@ -32,7 +32,7 @@ export const FirebaseNotesWidget: React.FC<FirebaseNotesWidgetProps> = ({
   repoId = 'repo-core-api', 
   repoName = 'khulnasoft/core-api-service' 
 }) => {
-  const { user, loginWithGoogle } = useAuth();
+  const { user, firebaseUser, loginWithGoogle } = useAuth();
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [newNoteText, setNewNoteText] = useState('');
   const [status, setStatus] = useState<'todo' | 'in_review' | 'resolved'>('todo');
@@ -41,7 +41,7 @@ export const FirebaseNotesWidget: React.FC<FirebaseNotesWidgetProps> = ({
 
   // Subscribe to real-time Firestore updates for user notes
   useEffect(() => {
-    if (!user) {
+    if (!user || !firebaseUser) {
       setNotes([]);
       return;
     }
@@ -72,7 +72,7 @@ export const FirebaseNotesWidget: React.FC<FirebaseNotesWidgetProps> = ({
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, firebaseUser]);
 
   // Create or Update Note
   const handleAddNote = async (e: React.FormEvent) => {
@@ -135,7 +135,7 @@ export const FirebaseNotesWidget: React.FC<FirebaseNotesWidgetProps> = ({
         </span>
       </div>
 
-      {!user ? (
+      {!firebaseUser ? (
         <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center space-y-3">
           <p className="text-slate-400 text-xs">Sign in with Google or OIDC to create and sync real-time database notes across sessions.</p>
           <button
