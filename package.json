@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "dev:debug": "tsx --inspect-brk server.ts",
+    "dev:docker": "docker-compose up -d && npm run dev",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
@@ -16,6 +17,9 @@
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx scripts/seed.ts",
     "db:reset": "rm -f *.db *.db-shm *.db-wal && npm run db:migrate",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
     "test": "vitest",
     "test:ui": "vitest --ui"
   },

@@ -104,7 +104,9 @@ export const FeatureFlagsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const resetToDefaults = () => {
-    setFlags(DEFAULT_FEATURE_FLAGS);
+    if (window.confirm('Reset all feature flags to defaults? This cannot be undone.')) {
+      setFlags(DEFAULT_FEATURE_FLAGS);
+    }
   };
 
   return (
