@@ -21,6 +21,11 @@ import { enqueueOrgSync } from './src/queue/syncProducer';
 import { config } from './src/config';
 import { createErrorHandler, asyncHandler } from './src/api/middleware/error-handler';
 import { runStartupChecks } from './src/startup';
+import { db } from './src/db';
+import { repositoryNotes, users } from './src/db/schema';
+import { eq, and } from 'drizzle-orm';
+import protectedRoutes from './src/api/routes/protected';
+import healthRoutes from './src/api/routes/health';
 
 dotenv.config();
 dotenv.config({ path: '.env.development.local' });
@@ -832,6 +837,67 @@ How can I assist you further with repository automation, documentation generatio
     });
   }
 });
+
+// ==================== NOTES API ====================
+
+app.get('/api/notes', async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId query parameter is required' });
+    }
+    const result = await db
+      .select()
+      .from(repositoryNotes)
+      .where(eq(repositoryNotes.userId, Number(userId)));
+    res.json({ success: true, notes: result });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to fetch notes', details: error.message });
+  }
+});
+
+app.post('/api/notes', async (req, res) => {
+  try {
+    const { userId, repoId, repoName, note, status } = req.body;
+    if (!userId || !repoId || !repoName || !note) {
+      return res.status(400).json({ error: 'userId, repoId, repoName, and note are required' });
+    }
+    const result = await db
+      .insert(repositoryNotes)
+      .values({
+        userId: Number(userId),
+        repoId,
+        repoName,
+        note,
+        status: status || 'todo',
+      })
+      .returning();
+    res.json({ success: true, note: result[0] });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to create note', details: error.message });
+  }
+});
+
+app.delete('/api/notes/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid note id' });
+    }
+    await db.delete(repositoryNotes).where(eq(repositoryNotes.id, id));
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to delete note', details: error.message });
+  }
+});
+
+// ==================== NEW PRODUCTION-GRADE API ROUTES ====================
+
+// Health check endpoints (no auth required)
+app.use('/api', healthRoutes);
+
+// Protected API routes (requires authentication)
+app.use('/api/v1', protectedRoutes);
 
 // ==================== ERROR HANDLER ====================
 

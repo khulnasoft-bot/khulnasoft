@@ -16,6 +16,18 @@ export function validateEnvironment(options: EnvValidationOptions = {}) {
     required = [],
   } = options;
 
+  // Construct DATABASE_URL from PG* vars if not set
+  if (!process.env.DATABASE_URL && process.env.PGHOST) {
+    const user = process.env.PGUSER || process.env.USER || 'postgres';
+    const password = process.env.PGPASSWORD || '';
+    const host = process.env.PGHOST || 'localhost';
+    const port = process.env.PGPORT || '5432';
+    const db = process.env.PGDATABASE || 'khulnasoft';
+    process.env.DATABASE_URL = `postgresql://${user}:${password}@${host}:${port}/${db}`;
+  }
+  if (!process.env.REDIS_HOST) process.env.REDIS_HOST = 'localhost';
+  if (!process.env.REDIS_PORT) process.env.REDIS_PORT = '6379';
+
   // Define default required variables
   const defaultRequired = [
     'DATABASE_URL',

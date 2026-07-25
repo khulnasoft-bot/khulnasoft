@@ -5,14 +5,24 @@ dotenv.config({ path: '.env.development.local' });
 
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
-// Define required vs optional environment variables
+if (!process.env.DATABASE_URL && process.env.PGHOST) {
+  const user = process.env.PGUSER || process.env.USER || 'postgres';
+  const password = process.env.PGPASSWORD || '';
+  const host = process.env.PGHOST || 'localhost';
+  const port = process.env.PGPORT || '5432';
+  const db = process.env.PGDATABASE || 'khulnasoft';
+  process.env.DATABASE_URL = `postgresql://${user}:${password}@${host}:${port}/${db}`;
+}
+
+if (!process.env.REDIS_HOST) process.env.REDIS_HOST = 'localhost';
+if (!process.env.REDIS_PORT) process.env.REDIS_PORT = '6379';
+
 const requiredEnvVars = [
   'DATABASE_URL',
   'REDIS_HOST',
   'REDIS_PORT',
 ];
 
-// GitHub vars are required in production, optional in development
 const githubVars = isDevelopment 
   ? [] 
   : ['GITHUB_APP_ID', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'];
@@ -56,6 +66,11 @@ export const config = {
     clientId: process.env.GITHUB_CLIENT_ID || 'development-default',
     clientSecret: process.env.GITHUB_CLIENT_SECRET || 'development-default',
     webhookSecret: process.env.GITHUB_WEBHOOK_SECRET || 'development-default',
+  },
+  supabase: {
+    url: process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    anonKey: process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   },
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || undefined,

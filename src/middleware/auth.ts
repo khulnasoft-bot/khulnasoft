@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { adminAuth } from '../lib/firebaseAdmin.ts';
-import { DecodedIdToken } from 'firebase-admin/auth';
+import { supabaseAdmin } from '../lib/supabaseAdmin';
 
 export interface AuthRequest extends Request {
-  user?: DecodedIdToken;
+  user?: { id: string; email?: string; aud?: string; role?: string };
 }
 
 export const requireAuth = async (
@@ -18,11 +17,14 @@ export const requireAuth = async (
 
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    req.user = decodedToken;
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      throw error || new Error('User not found');
+    }
+    req.user = { id: user.id, email: user.email, aud: user.aud, role: user.role };
     next();
   } catch (error) {
-    console.error('Error verifying Firebase ID token:', error);
+    console.error('Error verifying Supabase token:', error);
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 };

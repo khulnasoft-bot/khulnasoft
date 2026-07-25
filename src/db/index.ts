@@ -10,8 +10,13 @@ declare global {
 
 export const createPool = () => {
   if (!global._postgresPool) {
+    const dbUrl = process.env.DATABASE_URL || (
+      process.env.PGHOST
+        ? `postgresql://${process.env.PGUSER || 'postgres'}:${process.env.PGPASSWORD || ''}@${process.env.PGHOST}:${process.env.PGPORT || '5432'}/${process.env.PGDATABASE || 'khulnasoft'}`
+        : undefined
+    );
     const poolConfig = {
-      connectionString: process.env.DATABASE_URL,
+      connectionString: dbUrl,
       host: process.env.SQL_HOST,
       user: process.env.SQL_USER,
       password: process.env.SQL_PASSWORD,
