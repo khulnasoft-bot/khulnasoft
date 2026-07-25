@@ -33,7 +33,7 @@ import { Repository, TabType, DiscoveryPipelineEvent, OrgSyncStats } from '../ty
 import { SyncStatusIndicator } from '../components/SyncStatusIndicator';
 import { RepoHealthD3Charts } from '../components/RepoHealthD3Charts';
 import { RepoHealthMiniDashboard } from '../components/RepoHealthMiniDashboard';
-import { FirebaseNotesWidget } from '../components/FirebaseNotesWidget';
+import { NotesWidget } from '../components/NotesWidget';
 
 interface RepositoryCatalogViewProps {
   selectedRepoId: string;
@@ -531,8 +531,7 @@ export const RepositoryCatalogView: React.FC<RepositoryCatalogViewProps> = ({
                   </div>
                 </div>
 
-                {/* Firestore Real-Time Notes Widget */}
-                <FirebaseNotesWidget repoId={activeRepo.id} repoName={`${activeRepo.org}/${activeRepo.name}`} />
+                <NotesWidget repoId={activeRepo.id} repoName={`${activeRepo.org}/${activeRepo.name}`} />
 
                 {/* Sub Tab Navigation inside Inspector */}
                 <div className="flex border-b border-slate-800 space-x-6 text-xs font-medium pt-2 overflow-x-auto">

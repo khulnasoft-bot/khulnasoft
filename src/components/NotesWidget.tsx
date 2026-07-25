@@ -1,15 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  deleteDoc, 
-  serverTimestamp 
-} from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Database, FileText, Plus, Trash2, CheckCircle2, AlertCircle, Sparkles, Lock } from 'lucide-react';
 
@@ -20,106 +9,79 @@ interface NoteItem {
   userId: string;
   note: string;
   status: 'todo' | 'in_review' | 'resolved';
-  createdAt?: any;
+  createdAt?: string;
 }
 
-interface FirebaseNotesWidgetProps {
+interface NotesWidgetProps {
   repoId?: string;
   repoName?: string;
 }
 
-export const FirebaseNotesWidget: React.FC<FirebaseNotesWidgetProps> = ({ 
+export const NotesWidget: React.FC<NotesWidgetProps> = ({ 
   repoId = 'repo-core-api', 
   repoName = 'khulnasoft/core-api-service' 
 }) => {
-  const { user, firebaseUser, loginWithGoogle } = useAuth();
+  const { user, supabaseUser, loginWithGoogle } = useAuth();
   const [notes, setNotes] = useState<NoteItem[]>([]);
   const [newNoteText, setNewNoteText] = useState('');
   const [status, setStatus] = useState<'todo' | 'in_review' | 'resolved'>('todo');
   const [isSaving, setIsSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Subscribe to real-time Firestore updates for user notes
-  useEffect(() => {
-    if (!user || !firebaseUser) {
-      setNotes([]);
-      return;
+  const fetchNotes = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetch(`/api/notes?userId=${user.id}`);
+      if (!res.ok) throw new Error('Failed to fetch notes');
+      const data = await res.json();
+      setNotes(data.notes || []);
+      setErrorMsg(null);
+    } catch (err: any) {
+      setErrorMsg('Failed to load notes: ' + (err.message || 'Unknown error'));
     }
+  }, [user]);
 
-    const path = 'repositoryNotes';
-    const notesQuery = query(
-      collection(db, path),
-      where('userId', '==', user.id)
-    );
+  useEffect(() => {
+    fetchNotes();
+  }, [fetchNotes]);
 
-    const unsubscribe = onSnapshot(
-      notesQuery,
-      (snapshot) => {
-        const fetchedNotes: NoteItem[] = snapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        })) as NoteItem[];
-        setNotes(fetchedNotes);
-        setErrorMsg(null);
-      },
-      (error) => {
-        try {
-          handleFirestoreError(error, OperationType.GET, path);
-        } catch (e: any) {
-          setErrorMsg('Firestore access error: ' + (e.message || 'Permission denied'));
-        }
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user, firebaseUser]);
-
-  // Create or Update Note
   const handleAddNote = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newNoteText.trim() || !user) return;
 
     setIsSaving(true);
     setErrorMsg(null);
-    const noteId = `note-${Date.now()}`;
-    const path = 'repositoryNotes';
 
     try {
-      await setDoc(doc(db, path, noteId), {
-        id: noteId,
-        repoId,
-        repoName,
-        userId: user.id,
-        note: newNoteText.trim().substring(0, 2000),
-        status,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          repoId,
+          repoName,
+          note: newNoteText.trim().substring(0, 2000),
+          status,
+        }),
       });
-
+      if (!res.ok) throw new Error('Failed to save note');
       setNewNoteText('');
-    } catch (err) {
-      try {
-        handleFirestoreError(err, OperationType.WRITE, path);
-      } catch (e: any) {
-        setErrorMsg('Failed to save note to Firestore. ' + (e.message || 'Check Firestore rules.'));
-      }
+      await fetchNotes();
+    } catch (err: any) {
+      setErrorMsg('Failed to save note: ' + (err.message || 'Unknown error'));
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Delete Note
   const handleDeleteNote = async (noteId: string) => {
     if (!user) return;
-    const path = 'repositoryNotes';
     try {
-      await deleteDoc(doc(db, path, noteId));
-    } catch (err) {
-      try {
-        handleFirestoreError(err, OperationType.DELETE, path);
-      } catch (e: any) {
-        setErrorMsg('Failed to delete note: ' + (e.message || 'Error occurred'));
-      }
+      const res = await fetch(`/api/notes/${noteId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete note');
+      await fetchNotes();
+    } catch (err: any) {
+      setErrorMsg('Failed to delete note: ' + (err.message || 'Unknown error'));
     }
   };
 
@@ -128,16 +90,16 @@ export const FirebaseNotesWidget: React.FC<FirebaseNotesWidgetProps> = ({
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center space-x-2">
           <Database className="w-4 h-4 text-amber-400" />
-          <h3 className="font-bold text-slate-100 text-sm">Firestore Persisted Repository Notes</h3>
+          <h3 className="font-bold text-slate-100 text-sm">Repository Notes</h3>
         </div>
-        <span className="px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800/80 text-[10px] font-bold">
-          Cloud Firestore Active
+        <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800/80 text-[10px] font-bold">
+          PostgreSQL Active
         </span>
       </div>
 
-      {!firebaseUser ? (
+      {!supabaseUser ? (
         <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-center space-y-3">
-          <p className="text-slate-400 text-xs">Sign in with Google or OIDC to create and sync real-time database notes across sessions.</p>
+          <p className="text-slate-400 text-xs">Sign in with Google to create and persist notes across sessions.</p>
           <button
             onClick={loginWithGoogle}
             className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center space-x-2 cursor-pointer transition-all shadow-md shadow-amber-500/20"
@@ -155,7 +117,6 @@ export const FirebaseNotesWidget: React.FC<FirebaseNotesWidgetProps> = ({
             </div>
           )}
 
-          {/* New Note Form */}
           <form onSubmit={handleAddNote} className="space-y-2">
             <div className="flex items-center space-x-2">
               <input
@@ -186,11 +147,10 @@ export const FirebaseNotesWidget: React.FC<FirebaseNotesWidgetProps> = ({
             </div>
           </form>
 
-          {/* Notes List */}
           <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
             {notes.length === 0 ? (
               <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-slate-500 text-center text-xs">
-                No Firestore notes created yet for this account. Create one above to test live persistence!
+                No notes created yet. Create one above to test persistence!
               </div>
             ) : (
               notes.map((n) => (
@@ -217,7 +177,7 @@ export const FirebaseNotesWidget: React.FC<FirebaseNotesWidgetProps> = ({
                   <button
                     onClick={() => handleDeleteNote(n.id)}
                     className="p-1.5 rounded-lg hover:bg-rose-950 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
-                    title="Delete Note from Firestore"
+                    title="Delete Note"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

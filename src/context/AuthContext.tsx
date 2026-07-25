@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, googleProvider, signInWithPopup, signOut, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { User as SupabaseUser } from '@supabase/supabase-js';
+import { supabase, signInWithGoogle, signOut as supabaseSignOut } from '../lib/supabase';
 
 export type RoleType = 'Platform Admin' | 'Security Officer' | 'Senior DevOps' | 'Developer' | 'Auditor';
-export type SsoProviderType = 'Google Auth (Firebase)' | 'Okta OIDC' | 'Azure AD OAuth2' | 'Keycloak OIDC' | 'PingIdentity OIDC';
+export type SsoProviderType = 'Google Auth (Supabase)' | 'Okta OIDC' | 'Azure AD OAuth2' | 'Keycloak OIDC' | 'PingIdentity OIDC';
 
 export interface UserProfile {
   id: string;
@@ -19,13 +18,13 @@ export interface UserProfile {
   idToken: string;
   accessToken: string;
   refreshTokenString: string;
-  tokenExpiresAt: number; // Unix timestamp in ms
+  tokenExpiresAt: number;
   authTime: string;
 }
 
 interface AuthContextType {
   user: UserProfile | null;
-  firebaseUser: FirebaseUser | null;
+  supabaseUser: SupabaseUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   authError: string | null;
@@ -121,57 +120,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Fallback
       }
     }
-    return null; // Start unauthenticated if no saved session
+    return null;
   });
 
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [inspectTokensOpen, setInspectTokensOpen] = useState<boolean>(false);
 
-  // Sync Firebase Auth state
+  // Sync Supabase Auth state
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setFirebaseUser(fbUser);
-      if (fbUser) {
-        const token = await fbUser.getIdToken();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const sbUser = session?.user ?? null;
+      setSupabaseUser(sbUser);
+      if (sbUser) {
         const profile: UserProfile = {
-          id: fbUser.uid,
-          name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Firebase User',
-          email: fbUser.email || 'user@firebase.app',
-          avatarUrl: fbUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+          id: sbUser.id,
+          name: sbUser.user_metadata?.full_name || sbUser.email?.split('@')[0] || 'Supabase User',
+          email: sbUser.email || 'user@supabase.app',
+          avatarUrl: sbUser.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
           role: 'Platform Admin',
           org: 'khulnasoft',
-          ssoProvider: 'Google Auth (Firebase)',
-          scopes: ['openid', 'profile', 'email', 'firestore:read', 'firestore:write'],
-          mfaVerified: fbUser.emailVerified,
-          idToken: token,
-          accessToken: token,
-          refreshTokenString: fbUser.refreshToken,
-          tokenExpiresAt: Date.now() + 3600 * 1000 * 8,
+          ssoProvider: 'Google Auth (Supabase)',
+          scopes: ['openid', 'profile', 'email'],
+          mfaVerified: sbUser.email_confirmed_at ? true : false,
+          idToken: session?.access_token || '',
+          accessToken: session?.access_token || '',
+          refreshTokenString: session?.refresh_token || '',
+          tokenExpiresAt: session?.expires_at ? session.expires_at * 1000 : Date.now() + 3600 * 1000 * 8,
           authTime: new Date().toISOString(),
         };
 
         setUser(profile);
-
-        // Sync Firestore User Profile document
-        try {
-          const userDocRef = doc(db, 'users', fbUser.uid);
-          await setDoc(userDocRef, {
-            uid: fbUser.uid,
-            email: fbUser.email,
-            displayName: fbUser.displayName || profile.name,
-            photoURL: fbUser.photoURL || profile.avatarUrl,
-            lastLogin: serverTimestamp(),
-            createdAt: serverTimestamp(),
-          }, { merge: true });
-        } catch (err) {
-          console.warn('Firestore user profile sync warning:', err);
-        }
+      } else {
+        setUser(null);
       }
     });
 
-    return () => unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
   // Sync to localStorage
@@ -183,14 +169,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [user]);
 
-  // Google Login via Firebase
+  // Google Login via Supabase
   const loginWithGoogle = async () => {
     setIsLoading(true);
     setAuthError(null);
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithGoogle();
     } catch (err: any) {
-      console.error('Firebase Auth error:', err);
+      console.error('Supabase Auth error:', err);
       setAuthError(err?.message || 'Google sign in failed');
     } finally {
       setIsLoading(false);
@@ -237,7 +223,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     try {
-      await signOut(auth);
+      await supabaseSignOut();
     } catch (e) {
       // Ignore
     }
@@ -287,7 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
-        firebaseUser,
+        supabaseUser,
         isAuthenticated: !!user,
         isLoading,
         authError,

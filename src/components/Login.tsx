@@ -138,7 +138,7 @@ export const Login: React.FC = () => {
             </div>
             <div className="flex items-center space-x-1.5">
               <Globe className="w-3 h-3 text-indigo-400" />
-              <span>OAuth 2.0 / Firebase</span>
+              <span>OAuth 2.0 / Supabase</span>
             </div>
           </div>
         </div>

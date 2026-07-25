@@ -241,7 +241,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       className="w-full flex items-center justify-center space-x-2 p-2 rounded-xl bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-red-500/20 hover:from-amber-500/30 hover:to-red-500/30 text-amber-300 border border-amber-500/40 font-bold transition-all cursor-pointer"
                     >
                       <UserCheck className="w-4 h-4 text-amber-400" />
-                      <span>Sign In with Google (Firebase)</span>
+                      <span>Sign In with Google (Supabase)</span>
                     </button>
 
                     <div className="grid grid-cols-2 gap-1 text-[10px]">
