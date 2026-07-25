@@ -1,5 +1,5 @@
 import { discoverOrgRepos } from '../github/discovery';
-import { upsertRepositoryRecord, upsertOrganizationRecord, createSyncJobRecord, completeSyncJobRecord } from '../../../db/github';
+import { upsertRepositoryRecord, upsertOrganizationRecord, createSyncJobRecord, completeSyncJobRecord } from '../../db/github';
 
 export async function runOrgSync(orgLogin: string) {
     const org = orgLogin.toLowerCase();
