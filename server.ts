@@ -23,6 +23,7 @@ import { createErrorHandler, asyncHandler } from './src/api/middleware/error-han
 import { runStartupChecks } from './src/startup';
 
 dotenv.config();
+dotenv.config({ path: '.env.development.local' });
 
 const app = express();
 const PORT = config.port;
