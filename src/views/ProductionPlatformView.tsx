@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Github, 
   Workflow, 
@@ -34,6 +34,7 @@ import {
 import { MOCK_REPOSITORIES } from '../data/mockData';
 import { DeploymentHeatmap } from '../components/DeploymentHeatmap';
 import { DeploymentGate } from '../components/DeploymentGate';
+import { useFeatureFlags } from '../context/FeatureFlagsContext';
 
 // 9 Stages of the Production Platform Pipeline
 export interface PipelineStage {
@@ -73,12 +74,14 @@ export interface TargetPlatform {
 }
 
 export const ProductionPlatformView: React.FC = () => {
+  const { isFlagEnabled } = useFeatureFlags();
   const [selectedRepo, setSelectedRepo] = useState(MOCK_REPOSITORIES[0]);
   const [selectedStageId, setSelectedStageId] = useState<string>('github');
   const [selectedTargetId, setSelectedTargetId] = useState<'kubernetes' | 'docker' | 'vm' | 'baremetal' | 'edge' | 'cloud'>('kubernetes');
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationProgress, setSimulationProgress] = useState(0);
   const [copiedCode, setCopiedCode] = useState(false);
+  const stagesRef = useRef<PipelineStage[]>([]);
 
   // Initial stage data generator based on selected repository
   const [stages, setStages] = useState<PipelineStage[]>([
@@ -311,11 +314,17 @@ export const ProductionPlatformView: React.FC = () => {
     }));
   }, [selectedRepo]);
 
+  useEffect(() => {
+    stagesRef.current = stages;
+  }, [stages]);
+
   // Simulate pipeline execution step-by-step
   const handleRunPipelineSimulation = () => {
     if (isSimulating) return;
     setIsSimulating(true);
     setSimulationProgress(0);
+
+    const autoHealingEnabled = isFlagEnabled('enableAiAutoHealing');
 
     // Reset all stages to queued except first
     setStages(prev => prev.map((s, idx) => ({
@@ -324,25 +333,51 @@ export const ProductionPlatformView: React.FC = () => {
     })));
 
     let currentStep = 0;
-    const interval = setInterval(() => {
-      currentStep++;
-      if (currentStep < stages.length) {
-        const nextStageId = stages[currentStep].id;
-        setSelectedStageId(nextStageId);
-        setSimulationProgress(Math.round((currentStep / (stages.length - 1)) * 100));
+    const totalStages = stagesRef.current.length;
 
-        setStages(prev => prev.map((s, idx) => {
-          if (idx < currentStep) return { ...s, status: 'passed' };
-          if (idx === currentStep) return { ...s, status: 'running' };
-          return { ...s, status: 'queued' };
-        }));
+    const advanceStep = () => {
+      currentStep++;
+      if (currentStep < totalStages) {
+        const nextStageId = stagesRef.current[currentStep].id;
+        setSelectedStageId(nextStageId);
+        setSimulationProgress(Math.round((currentStep / (totalStages - 1)) * 100));
+
+        // Simulate random failure (15% chance) on non-first/last stages
+        const shouldFail = currentStep > 0 && currentStep < totalStages - 1 && Math.random() < 0.15;
+
+        if (shouldFail) {
+          setStages(prev => prev.map((s, idx) => {
+            if (idx < currentStep) return { ...s, status: 'passed' };
+            if (idx === currentStep) return { ...s, status: 'failed' };
+            return { ...s, status: 'queued' };
+          }));
+
+          if (autoHealingEnabled) {
+            // Auto-healing: reset failed stage and retry after delay
+            setTimeout(() => {
+              setStages(prev => prev.map((s, idx) => {
+                if (idx === currentStep) return { ...s, status: 'running' };
+                return s;
+              }));
+              setTimeout(advanceStep, 900);
+            }, 1500);
+          }
+        } else {
+          setStages(prev => prev.map((s, idx) => {
+            if (idx < currentStep) return { ...s, status: 'passed' };
+            if (idx === currentStep) return { ...s, status: 'running' };
+            return { ...s, status: 'queued' };
+          }));
+          setTimeout(advanceStep, 900);
+        }
       } else {
-        clearInterval(interval);
         setStages(prev => prev.map(s => ({ ...s, status: 'passed' })));
         setSimulationProgress(100);
         setIsSimulating(false);
       }
-    }, 900);
+    };
+
+    setTimeout(advanceStep, 900);
   };
 
   // 6 Deployment Targets Specs

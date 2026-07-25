@@ -10,17 +10,26 @@ declare global {
 
 export const createPool = () => {
   if (!global._postgresPool) {
-    global._postgresPool = new Pool({
+    const poolConfig = {
+      connectionString: process.env.DATABASE_URL,
       host: process.env.SQL_HOST,
       user: process.env.SQL_USER,
       password: process.env.SQL_PASSWORD,
       database: process.env.SQL_DB_NAME,
       max: 10,
       connectionTimeoutMillis: 15000,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    };
+
+    console.log('[DB] Connecting to database...');
+    global._postgresPool = new Pool(poolConfig);
+
+    global._postgresPool.on('connect', () => {
+      console.log('Database pool connection established');
     });
 
     global._postgresPool.on('error', (err) => {
-      console.error('Unexpected error on idle SQL pool client:', err);
+      console.error('Database pool error:', err);
     });
   }
   return global._postgresPool;
@@ -29,3 +38,14 @@ export const createPool = () => {
 const pool = createPool();
 
 export const db = drizzle(pool, { schema });
+
+export async function checkDatabaseHealth() {
+  try {
+    await db.execute('SELECT 1');
+    console.log('Database connection healthy');
+    return true;
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    return false;
+  }
+}
