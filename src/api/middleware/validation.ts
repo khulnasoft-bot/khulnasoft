@@ -37,3 +37,10 @@ export function validateParams(schema: ZodSchema) {
     }
   };
 }
+
+/**
+ * Validate request body - convenience wrapper
+ */
+export function validateRequest(schema: ZodSchema) {
+  return validateBody(schema);
+}

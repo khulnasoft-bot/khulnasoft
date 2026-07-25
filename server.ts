@@ -24,6 +24,8 @@ import { runStartupChecks } from './src/startup';
 import { db } from './src/db';
 import { repositoryNotes, users } from './src/db/schema';
 import { eq, and } from 'drizzle-orm';
+import protectedRoutes from './src/api/routes/protected';
+import healthRoutes from './src/api/routes/health';
 
 dotenv.config();
 dotenv.config({ path: '.env.development.local' });
@@ -888,6 +890,14 @@ app.delete('/api/notes/:id', async (req, res) => {
     res.status(500).json({ error: 'Failed to delete note', details: error.message });
   }
 });
+
+// ==================== NEW PRODUCTION-GRADE API ROUTES ====================
+
+// Health check endpoints (no auth required)
+app.use('/api', healthRoutes);
+
+// Protected API routes (requires authentication)
+app.use('/api/v1', protectedRoutes);
 
 // ==================== ERROR HANDLER ====================
 
