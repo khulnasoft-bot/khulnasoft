@@ -29,4 +29,15 @@ syncWorker.on('failed', (job, err) => {
     console.error(`Org sync job ${job?.id} failed:`, err?.message || err);
 });
 
+export async function checkRedisHealth() {
+  try {
+    await connection.ping();
+    console.log('Redis connection healthy');
+    return true;
+  } catch (error) {
+    console.error('Redis connection failed:', error);
+    return false;
+  }
+}
+
 export default { syncQueue, syncWorker };

@@ -18,11 +18,14 @@ import {
 } from './src/db/github.ts';
 import GitHubClient from './src/services/github/client';
 import { enqueueOrgSync } from './src/queue/syncProducer';
+import { config } from './src/config';
+import { createErrorHandler, asyncHandler } from './src/api/middleware/error-handler';
+import { runStartupChecks } from './src/startup';
 
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = config.port;
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -83,7 +86,14 @@ app.post('/api/github/webhook', express.raw({ type: 'application/json' }), (req,
 
 // ==================== PHASE 1 REPOSITORY CATALOG API ROUTES ====================
 
-// GET /api/repositories - Catalog listing with filtering
+/**
+ * GET /api/repositories
+ * @description Get repository catalog with optional filtering
+ * @query {string} q - Search query (name, description, topics)
+ * @query {string} language - Filter by language
+ * @query {string} framework - Filter by framework
+ * @returns {Object} { success: boolean, count: number, repositories: Repository[] }
+ */
 app.get('/api/repositories', (req, res) => {
   const { q, language, framework, projectType, maturity, visibility } = req.query;
 
@@ -244,7 +254,12 @@ app.get('/api/repositories/:id', (req, res) => {
   res.json({ success: true, repository: repo });
 });
 
-// POST /api/sync - Organization Discovery & Clone Sync Pipeline Trigger
+/**
+ * POST /api/sync
+ * @description Trigger organization discovery & sync
+ * @body {string} orgName - GitHub organization name
+ * @returns {Object} { success: boolean, syncedAt: ISO8601, stats: Object }
+ */
 app.post('/api/sync', (req, res) => {
   const { orgName } = req.body;
   const targetOrg = orgName || 'khulnasoft';
@@ -817,9 +832,15 @@ How can I assist you further with repository automation, documentation generatio
   }
 });
 
+// ==================== ERROR HANDLER ====================
+
+app.use(createErrorHandler());
+
 // ==================== SERVE FRONTEND ====================
 
-async function startServer() {
+async function start() {
+  await runStartupChecks();
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -835,8 +856,11 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 KhulnaSoft Platform server running on http://0.0.0.0:${PORT}`);
+    console.log(`KhulnaSoft Platform server running on http://0.0.0.0:${PORT}`);
   });
 }
 
-startServer();
+start().catch(err => {
+  console.error('Failed to start server:', err);
+  process.exit(1);
+});
